@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 from docx import Document
 from datetime import datetime
-import time
 import sqlite3
 
 # Создание или подключение к базе данных SQLite
@@ -17,7 +16,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS payment_requests
               hourly_rate REAL,
               supervisor_position TEXT,
               supervisor_initials TEXT,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+              created_at TIMESTAMP)''')
 conn.commit()
 
 def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials):
@@ -34,8 +33,8 @@ def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_
         doc.add_heading('Заявление на почасовую оплату', 0)
 
         # Дата
-        current_time = time.strftime("%d.%m.%Y")
-        doc.add_paragraph(f'Дата: {current_time}')
+        current_time = datetime.now()
+        doc.add_paragraph(f'Дата: {current_time.strftime("%d.%m.%Y %H:%M:%S")}')
 
         # Информация о сотруднике
         doc.add_paragraph(f'Сотрудник: {employee_name}')
@@ -57,14 +56,14 @@ def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_
         doc.add_paragraph(f'Подпись: _____________________')
 
         # Сохранение документа
-        filename = f'Заявление_{employee_name}_{datetime.now().strftime("%Y%m%d")}.docx'
+        filename = f'Заявление_{employee_name}_{current_time.strftime("%Y%m%d_%H%M%S")}.docx'
         doc.save(filename)
         print(f'Заявление сохранено как {filename}')
         messagebox.showinfo('Успех', f'Заявление сохранено как {filename}')
 
         # Сохранение данных в базу
-        c.execute('''INSERT INTO payment_requests (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials)
-                     VALUES (?, ?, ?, ?, ?)''', (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials))
+        c.execute('''INSERT INTO payment_requests (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?)''', (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials, current_time))
         conn.commit()
 
     except Exception as e:
@@ -86,8 +85,10 @@ def generate_report():
         report_doc.add_heading('Отчет о созданных заявлениях', 0)
 
         for row in rows:
-            created_date = datetime.strptime(row[6], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y")
-            report_doc.add_paragraph(f'Заявление от {created_date}')
+            # Если строка времени содержит миллисекунды, они будут отброшены
+            created_at_str = row[6].split('.')[0]
+            created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
+            report_doc.add_paragraph(f'Заявление от {created_at.strftime("%d.%m.%Y %H:%M:%S")}')
             report_doc.add_paragraph(f'Сотрудник: {row[1]}')
             report_doc.add_paragraph(f'Отработанные часы: {row[2]}')
             report_doc.add_paragraph(f'Почасовая ставка: {row[3]}')

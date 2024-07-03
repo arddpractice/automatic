@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from docx import Document
 from datetime import datetime
+import time
 import sqlite3
 
 # Создание или подключение к базе данных SQLite
@@ -33,7 +34,8 @@ def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_
         doc.add_heading('Заявление на почасовую оплату', 0)
 
         # Дата
-        doc.add_paragraph(f'Дата: {datetime.now().strftime("%d.%m.%Y")}')
+        current_time = time.strftime("%d.%m.%Y")
+        doc.add_paragraph(f'Дата: {current_time}')
 
         # Информация о сотруднике
         doc.add_paragraph(f'Сотрудник: {employee_name}')
@@ -52,7 +54,7 @@ def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_
         # Подпись руководителя
         doc.add_paragraph(f'\n{supervisor_position}')
         doc.add_paragraph(f'{supervisor_initials}')
-        doc.add_paragraph(f'Подпись руководителя: _____________________')
+        doc.add_paragraph(f'Подпись: _____________________')
 
         # Сохранение документа
         filename = f'Заявление_{employee_name}_{datetime.now().strftime("%Y%m%d")}.docx'
@@ -84,12 +86,13 @@ def generate_report():
         report_doc.add_heading('Отчет о созданных заявлениях', 0)
 
         for row in rows:
-            report_doc.add_paragraph(f'Заявление от {row[6]}')
+            created_date = datetime.strptime(row[6], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y")
+            report_doc.add_paragraph(f'Заявление от {created_date}')
             report_doc.add_paragraph(f'Сотрудник: {row[1]}')
             report_doc.add_paragraph(f'Отработанные часы: {row[2]}')
             report_doc.add_paragraph(f'Почасовая ставка: {row[3]}')
-            report_doc.add_paragraph(f'Должность руководителя: {row[4]}')
-            report_doc.add_paragraph(f'И.О.Ф. руководителя: {row[5]}')
+            report_doc.add_paragraph(f' {row[4]}')
+            report_doc.add_paragraph(f' {row[5]}')
             report_doc.add_paragraph('-----------------------------------------')
 
         report_filename = f'Отчет_заявления_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
@@ -133,7 +136,7 @@ tk.Label(root, text="Должность руководителя").grid(row=3)
 entry_supervisor_position = tk.Entry(root)
 entry_supervisor_position.grid(row=3, column=1)
 
-tk.Label(root, text="И.О.Ф. руководителя").grid(row=4)
+tk.Label(root, text="Ф.И.О руководителя").grid(row=4)
 entry_supervisor_initials = tk.Entry(root)
 entry_supervisor_initials.grid(row=4, column=1)
 

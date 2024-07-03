@@ -1,56 +1,114 @@
-# gui_payment_request.py
-
 import tkinter as tk
 from tkinter import messagebox
 from docx import Document
 from datetime import datetime
+import sqlite3
 
-def create_payment_request(employee_name, employee_id, hours_worked, hourly_rate, supervisor_position, supervisor_initials):
-    # Создаем новый документ
-    doc = Document()
+# Создание или подключение к базе данных SQLite
+conn = sqlite3.connect('payment_requests.db')
+c = conn.cursor()
 
-    # Заголовок
-    doc.add_heading('Заявление на почасовую оплату', 0)
+# Создание таблицы, если она не существует
+c.execute('''CREATE TABLE IF NOT EXISTS payment_requests
+             (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              employee_name TEXT,
+              hours_worked REAL,
+              hourly_rate REAL,
+              supervisor_position TEXT,
+              supervisor_initials TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+conn.commit()
 
-    # Дата
-    doc.add_paragraph(f'Дата: {datetime.now().strftime("%d.%m.%Y")}')
+def create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials):
+    try:
+        # Валидация данных
+        if hours_worked <= 0 or hourly_rate <= 0 or not employee_name or not supervisor_position or not supervisor_initials:
+            messagebox.showerror("Ошибка", "Пожалуйста, заполните все поля корректно.")
+            return
 
-    # Информация о сотруднике
-    doc.add_paragraph(f'Сотрудник: {employee_name}')
-    doc.add_paragraph(f'Табельный номер: {employee_id}')
+        # Создаем новый документ
+        doc = Document()
 
-    # Информация о почасовой оплате
-    doc.add_paragraph(f'Количество отработанных часов: {hours_worked}')
-    doc.add_paragraph(f'Почасовая ставка: {hourly_rate:.2f} руб.')
+        # Заголовок
+        doc.add_heading('Заявление на почасовую оплату', 0)
 
-    # Общая сумма к оплате
-    total_payment = hours_worked * hourly_rate
-    doc.add_paragraph(f'Общая сумма к оплате: {total_payment:.2f} руб.')
+        # Дата
+        doc.add_paragraph(f'Дата: {datetime.now().strftime("%d.%m.%Y")}')
 
-    # Подпись сотрудника
-    doc.add_paragraph(f'\nПодпись сотрудника: _____________________')
+        # Информация о сотруднике
+        doc.add_paragraph(f'Сотрудник: {employee_name}')
 
-    # Подпись руководителя
-    doc.add_paragraph(f'\n{supervisor_position}')
-    doc.add_paragraph(f'{supervisor_initials}')
-    doc.add_paragraph(f'Подпись руководителя: _____________________')
+        # Информация о почасовой оплате
+        doc.add_paragraph(f'Количество отработанных часов: {hours_worked}')
+        doc.add_paragraph(f'Почасовая ставка: {hourly_rate:.2f} руб.')
 
-    # Сохранение документа
-    filename = f'Заявление_{employee_id}_{datetime.now().strftime("%Y%m%d")}.docx'
-    doc.save(filename)
-    print(f'Заявление сохранено как {filename}')
-    messagebox.showinfo('Успех', f'Заявление сохранено как {filename}')
+        # Общая сумма к оплате
+        total_payment = hours_worked * hourly_rate
+        doc.add_paragraph(f'Общая сумма к оплате: {total_payment:.2f} руб.')
+
+        # Подпись сотрудника
+        doc.add_paragraph(f'\nПодпись сотрудника: _____________________')
+
+        # Подпись руководителя
+        doc.add_paragraph(f'\n{supervisor_position}')
+        doc.add_paragraph(f'{supervisor_initials}')
+        doc.add_paragraph(f'Подпись руководителя: _____________________')
+
+        # Сохранение документа
+        filename = f'Заявление_{employee_name}_{datetime.now().strftime("%Y%m%d")}.docx'
+        doc.save(filename)
+        print(f'Заявление сохранено как {filename}')
+        messagebox.showinfo('Успех', f'Заявление сохранено как {filename}')
+
+        # Сохранение данных в базу
+        c.execute('''INSERT INTO payment_requests (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials)
+                     VALUES (?, ?, ?, ?, ?)''', (employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials))
+        conn.commit()
+
+    except Exception as e:
+        print(f'Ошибка при создании заявления: {e}')
+        messagebox.showerror("Ошибка", "Произошла ошибка при создании заявления.")
+
+def generate_report():
+    try:
+        # Запрос на получение данных о заявлениях из базы
+        c.execute('''SELECT * FROM payment_requests''')
+        rows = c.fetchall()
+
+        if not rows:
+            messagebox.showinfo("Отчет", "Нет данных о заявлениях.")
+            return
+
+        # Создание отчета
+        report_doc = Document()
+        report_doc.add_heading('Отчет о созданных заявлениях', 0)
+
+        for row in rows:
+            report_doc.add_paragraph(f'Заявление от {row[6]}')
+            report_doc.add_paragraph(f'Сотрудник: {row[1]}')
+            report_doc.add_paragraph(f'Отработанные часы: {row[2]}')
+            report_doc.add_paragraph(f'Почасовая ставка: {row[3]}')
+            report_doc.add_paragraph(f'Должность руководителя: {row[4]}')
+            report_doc.add_paragraph(f'И.О.Ф. руководителя: {row[5]}')
+            report_doc.add_paragraph('-----------------------------------------')
+
+        report_filename = f'Отчет_заявления_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
+        report_doc.save(report_filename)
+        messagebox.showinfo('Отчет', f'Отчет сохранен как {report_filename}')
+
+    except Exception as e:
+        print(f'Ошибка при создании отчета: {e}')
+        messagebox.showerror("Ошибка", "Произошла ошибка при создании отчета.")
 
 def on_submit():
     try:
         employee_name = entry_employee_name.get()
-        employee_id = entry_employee_id.get()
         hours_worked = float(entry_hours_worked.get())
         hourly_rate = float(entry_hourly_rate.get())
         supervisor_position = entry_supervisor_position.get()
         supervisor_initials = entry_supervisor_initials.get()
 
-        create_payment_request(employee_name, employee_id, hours_worked, hourly_rate, supervisor_position, supervisor_initials)
+        create_payment_request(employee_name, hours_worked, hourly_rate, supervisor_position, supervisor_initials)
     except ValueError:
         messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения для отработанных часов и почасовой ставки.")
 
@@ -63,29 +121,32 @@ tk.Label(root, text="Имя сотрудника").grid(row=0)
 entry_employee_name = tk.Entry(root)
 entry_employee_name.grid(row=0, column=1)
 
-tk.Label(root, text="Табельный номер").grid(row=1)
-entry_employee_id = tk.Entry(root)
-entry_employee_id.grid(row=1, column=1)
-
-tk.Label(root, text="Отработанные часы").grid(row=2)
+tk.Label(root, text="Отработанные часы").grid(row=1)
 entry_hours_worked = tk.Entry(root)
-entry_hours_worked.grid(row=2, column=1)
+entry_hours_worked.grid(row=1, column=1)
 
-tk.Label(root, text="Почасовая ставка").grid(row=3)
+tk.Label(root, text="Почасовая ставка").grid(row=2)
 entry_hourly_rate = tk.Entry(root)
-entry_hourly_rate.grid(row=3, column=1)
+entry_hourly_rate.grid(row=2, column=1)
 
-tk.Label(root, text="Должность руководителя").grid(row=4)
+tk.Label(root, text="Должность руководителя").grid(row=3)
 entry_supervisor_position = tk.Entry(root)
-entry_supervisor_position.grid(row=4, column=1)
+entry_supervisor_position.grid(row=3, column=1)
 
-tk.Label(root, text="Руководитель").grid(row=5)
+tk.Label(root, text="И.О.Ф. руководителя").grid(row=4)
 entry_supervisor_initials = tk.Entry(root)
-entry_supervisor_initials.grid(row=5, column=1)
+entry_supervisor_initials.grid(row=4, column=1)
 
 # Кнопка отправки
 submit_button = tk.Button(root, text="Создать заявление", command=on_submit)
-submit_button.grid(row=6, columnspan=2)
+submit_button.grid(row=5, columnspan=2)
+
+# Кнопка для генерации отчета
+report_button = tk.Button(root, text="Сгенерировать отчет", command=generate_report)
+report_button.grid(row=6, columnspan=2)
 
 # Запуск основного цикла
 root.mainloop()
+
+# Закрываем соединение с базой данных при выходе из программы
+conn.close()
